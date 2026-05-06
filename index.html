@@ -29,6 +29,12 @@
   .leg-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: rgba(180,195,230,0.7); }
   .leg-swatch { width: 24px; height: 9px; border-radius: 2px; flex-shrink: 0; }
   .leg-dash { width: 24px; height: 0; border-top: 1.5px dashed rgba(255,220,60,0.65); flex-shrink: 0; }
+  #tooltip .tip-title { font-weight: 600; margin-bottom: 4px; }
+  #tooltip .tip-block { padding: 4px 0; border-top: 0.5px solid rgba(255,255,255,0.08); }
+  #tooltip .tip-block:first-of-type { border-top: none; padding-top: 0; }
+  #tooltip .tip-block:last-of-type { padding-bottom: 0; }
+  #tooltip .tip-head { color: #ffd07a; font-weight: 600; margin-bottom: 2px; }
+  #tooltip .tip-row { display: flex; gap: 18px; }
 </style>
 </head>
 <body>
@@ -263,16 +269,22 @@
     const doy = Math.round(1 + ((mx - PAD_L) / chartW) * (DAYS - 1));
     const d = data[Math.max(0, Math.min(DAYS - 1, doy - 1))];
     tip.innerHTML =
-      `<strong>${doyToDate(d.doy)}</strong><br>` +
-      `Amanecer náutico: ${fmt(d.dawnNaut)}<br>` +
-      `Amanecer civil: ${fmt(d.dawnCivil)}<br>` +
-      `Amanecer: ${fmt(d.rise)}<br>` +
-      `Mediod\u00eda: ${fmt(d.noon)}<br>` +
-      `Atardecer: ${fmt(d.set)}<br>` +
-      `Crepúsculo civil: ${fmt(d.duskCivil)}<br>` +
-      `Crepúsculo náutico: ${fmt(d.duskNaut)}<br>` +
-      `Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong><br>` +
-      `Horario: UTC+${d.offset}`;
+     `<div class="tip-title">${doyToDate(d.doy)}</div>` +
+     `<div class="tip-block">` +
+       `<div class="tip-head">🌅 Amanecer</div>` +
+       `<div class="tip-row"><span>Náutico: ${fmt(d.dawnNaut)}</span><span>Civil: ${fmt(d.dawnCivil)}</span></div>` +
+       `<div>Salida: <strong>${fmt(d.rise)}</strong></div>` +
+     `</div>` +
+     `<div class="tip-block">` +
+       `<div>Mediodía: ${fmt(d.noon)}</div>` +
+       `<div>Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong></div>` +
+       `<div>Horario: UTC+${d.offset}</div>` +
+     `</div>` +
+     `<div class="tip-block">` +
+       `<div class="tip-head">🌇 Atardecer</div>` +
+       `<div>Puesta: <strong>${fmt(d.set)}</strong></div>` +
+       `<div class="tip-row"><span>Civil: ${fmt(d.duskCivil)}</span><span>Náutico: ${fmt(d.duskNaut)}</span></div>` +
+     `</div>`;
     tip.style.display = 'block';
     const tipW = tip.offsetWidth;
     let lx = e.clientX - rect.left + 14;
