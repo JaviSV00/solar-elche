@@ -257,8 +257,8 @@
 
     // Cambios de horario (último domingo de marzo y de octubre)
     [
-      { doy: springDoy, label: 'UTC+2' },
-      { doy: fallDoy,   label: 'UTC+1' }
+      { doy: springDoy, label: 'UTC+2', sub: '(Verano)' },
+      { doy: fallDoy,   label: 'UTC+1', sub: '(Invierno)' }
     ].forEach(({ doy, label }) => {
       const x = xOf(doy);
       ctx.beginPath();
