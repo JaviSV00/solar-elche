@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0033)file:///X:/Descargas/index_3.html -->
-<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="es"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Luz solar anual · Elche</title>
 <style>
@@ -40,8 +38,8 @@
 <body>
 <div id="wrap">
   <div id="canvas-wrap">
-    <canvas id="ac" width="1900" height="884"></canvas>
-    <div id="tooltip" style="display: block; left: 787px; top: 325px;"><strong>25 de mayo</strong><br>Amanecer: 06:45<br>Mediodía: 14:00<br>Atardecer: 21:15<br>Luz solar: <strong>14h 30m</strong><br>Horario: UTC+2</div>
+    <canvas id="ac"></canvas>
+    <div id="tooltip"></div>
   </div>
   <div class="legend">
     <div class="leg-item"><div class="leg-swatch" style="background:#c8753a;"></div>Luz solar</div>
@@ -153,6 +151,7 @@
 
   let W, H, PAD_L, PAD_R, PAD_T, PAD_B, chartW, chartH;
 
+  const xs = new Float32Array(DAYS);
   function setup(){
     W = canvasWrap.offsetWidth;
     H = canvasWrap.offsetHeight;
@@ -161,6 +160,7 @@
     PAD_L = 38; PAD_R = 10; PAD_T = 16; PAD_B = 24;
     chartW = W - PAD_L - PAD_R;
     chartH = H - PAD_T - PAD_B;
+    for(let i = 0; i < DAYS; i++) xs[i] = PAD_L + (i / (DAYS - 1)) * chartW;
   }
 
   function xOf(doy){ return PAD_L + ((doy - 1) / (DAYS - 1)) * chartW; }
@@ -168,9 +168,9 @@
 
   function drawBand(topFn, botFn, color){
     ctx.beginPath();
-    ctx.moveTo(xOf(data[0].doy), yOf(topFn(data[0])));
-    for(let i = 1; i < data.length; i++) ctx.lineTo(xOf(data[i].doy), yOf(topFn(data[i])));
-    for(let i = data.length - 1; i >= 0; i--) ctx.lineTo(xOf(data[i].doy), yOf(botFn(data[i])));
+    ctx.moveTo(xs[0], yOf(topFn(data[0])));
+    for(let i = 1; i < data.length; i++) ctx.lineTo(xs[i], yOf(topFn(data[i])));
+    for(let i = data.length - 1; i >= 0; i--) ctx.lineTo(xs[i], yOf(botFn(data[i])));
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
@@ -182,8 +182,8 @@
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     for(let i = 0; i < data.length; i++){
-      const x = xOf(data[i].doy), y = yOf(fn(data[i]));
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      const y = yOf(fn(data[i]));
+      i === 0 ? ctx.moveTo(xs[i], y) : ctx.lineTo(xs[i], y);
     }
     ctx.stroke();
     ctx.setLineDash([]);
@@ -192,13 +192,10 @@
   function draw(){
     setup();
     ctx.clearRect(0, 0, W, H);
-
-    ctx.fillStyle = '#0e1628';
-    ctx.fillRect(PAD_L, PAD_T, chartW, chartH);
-
+  
     drawBand(d => d.dawnNaut,  d => d.duskNaut,  '#283870');
     drawBand(d => d.dawnCivil, d => d.duskCivil, '#5a3a6e');
-    drawBand(d => d.rise,      d => d.set,        '#c8753a');
+    drawBand(d => d.rise,      d => d.set,       '#c8753a');
 
     const gSun = ctx.createLinearGradient(0, yOf(22), 0, yOf(5));
     gSun.addColorStop(0,   'rgba(210,110,40,0)');
@@ -259,7 +256,7 @@
     [
       { doy: springDoy, label: 'UTC+2', sub: '(Verano)' },
       { doy: fallDoy,   label: 'UTC+1', sub: '(Invierno)' }
-    ].forEach(({ doy, label }) => {
+    ].forEach(({ doy, label, sub }) => {
       const x = xOf(doy);
       ctx.beginPath();
       ctx.setLineDash([3, 3]);
@@ -273,6 +270,10 @@
       ctx.font = 'bold 9px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(label, x, PAD_T + 9);
+      ctx.fillStyle = 'rgba(150,210,255,0.65)';
+      ctx.font = '8px -apple-system, sans-serif';
+      ctx.fillText(sub, x, PAD_T + 20);
+      });
     });
    
     ctx.strokeRect(PAD_L, PAD_T, chartW, chartH);
@@ -280,7 +281,48 @@
 
   draw();
 
+  // Estructura del tooltip creada UNA sola vez
+  tip.innerHTML =
+    `<div class="tip-title"></div>` +
+    `<div class="tip-block">` +
+      `<div class="tip-head">🌅 Amanecer</div>` +
+      `<div class="tip-row"><span class="dn"></span><span class="dc"></span></div>` +
+      `<div class="rise"></div>` +
+    `</div>` +
+    `<div class="tip-block">` +
+      `<div class="noon"></div>` +
+      `<div class="dur"></div>` +
+    `</div>` +
+    `<div class="tip-block">` +
+      `<div class="tip-head">🌇 Atardecer</div>` +
+      `<div class="set"></div>` +
+      `<div class="tip-row"><span class="dskc"></span><span class="dskn"></span></div>` +
+    `</div>`;
+  
+  const tipEls = {
+    title: tip.querySelector('.tip-title'),
+    dn:    tip.querySelector('.dn'),
+    dc:    tip.querySelector('.dc'),
+    rise:  tip.querySelector('.rise'),
+    noon:  tip.querySelector('.noon'),
+    dur:   tip.querySelector('.dur'),
+    set:   tip.querySelector('.set'),
+    dskc:  tip.querySelector('.dskc'),
+    dskn:  tip.querySelector('.dskn'),
+  };
+  
+  let pendingEvent = null, rafScheduled = false;
   canvas.addEventListener('mousemove', e => {
+    pendingEvent = e;
+    if(rafScheduled) return;
+    rafScheduled = true;
+    requestAnimationFrame(() => {
+      rafScheduled = false;
+      handleMove(pendingEvent);
+    });
+  });
+  
+  function handleMove(e){
     const rect = canvas.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
     const my = (e.clientY - rect.top) * (canvas.height / rect.height);
@@ -289,29 +331,24 @@
     }
     const doy = Math.round(1 + ((mx - PAD_L) / chartW) * (DAYS - 1));
     const d = data[Math.max(0, Math.min(DAYS - 1, doy - 1))];
-    tip.innerHTML =
-     `<div class="tip-title">${doyToDate(d.doy)}</div>` +
-     `<div class="tip-block">` +
-       `<div class="tip-head">🌅 Amanecer</div>` +
-       `<div class="tip-row"><span>Náutico: ${fmt(d.dawnNaut)}</span><span>Civil: ${fmt(d.dawnCivil)}</span></div>` +
-       `<div>Salida: <strong>${fmt(d.rise)}</strong></div>` +
-     `</div>` +
-     `<div class="tip-block">` +
-       `<div>Mediodía: ${fmt(d.noon)}</div>` +
-       `<div>Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong></div>` +
-     `</div>` +
-     `<div class="tip-block">` +
-       `<div class="tip-head">🌇 Atardecer</div>` +
-       `<div>Puesta: <strong>${fmt(d.set)}</strong></div>` +
-       `<div class="tip-row"><span>Civil: ${fmt(d.duskCivil)}</span><span>Náutico: ${fmt(d.duskNaut)}</span></div>` +
-     `</div>`;
+  
+    tipEls.title.textContent = doyToDate(d.doy);
+    tipEls.dn.textContent    = `Náutico: ${fmt(d.dawnNaut)}`;
+    tipEls.dc.textContent    = `Civil: ${fmt(d.dawnCivil)}`;
+    tipEls.rise.innerHTML    = `Salida: <strong>${fmt(d.rise)}</strong>`;
+    tipEls.noon.textContent  = `Mediodía: ${fmt(d.noon)}`;
+    tipEls.dur.innerHTML     = `Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong>`;
+    tipEls.set.innerHTML     = `Puesta: <strong>${fmt(d.set)}</strong>`;
+    tipEls.dskc.textContent  = `Civil: ${fmt(d.duskCivil)}`;
+    tipEls.dskn.textContent  = `Náutico: ${fmt(d.duskNaut)}`;
+  
     tip.style.display = 'block';
     const tipW = tip.offsetWidth;
     let lx = e.clientX - rect.left + 14;
     if(lx + tipW > rect.width - 8) lx = e.clientX - rect.left - tipW - 14;
     tip.style.left = lx + 'px';
-    tip.style.top = (e.clientY - rect.top - 20) + 'px';
-  });
+    tip.style.top  = (e.clientY - rect.top - 20) + 'px';
+  }
   canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
 
   let resizeTimer;
