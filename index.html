@@ -254,6 +254,27 @@
 
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 0.5;
+
+    // Cambios de horario (último domingo de marzo y de octubre)
+    [
+      { doy: springDoy, label: 'UTC+2' },
+      { doy: fallDoy,   label: 'UTC+1' }
+    ].forEach(({ doy, label }) => {
+      const x = xOf(doy);
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = 'rgba(120,200,255,0.5)';
+      ctx.lineWidth = 1;
+      ctx.moveTo(x, PAD_T);
+      ctx.lineTo(x, PAD_T + chartH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(150,210,255,0.85)';
+      ctx.font = 'bold 9px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, PAD_T + 9);
+    });
+   
     ctx.strokeRect(PAD_L, PAD_T, chartW, chartH);
   }
 
@@ -278,7 +299,6 @@
      `<div class="tip-block">` +
        `<div>Mediodía: ${fmt(d.noon)}</div>` +
        `<div>Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong></div>` +
-       `<div>Horario: UTC+${d.offset}</div>` +
      `</div>` +
      `<div class="tip-block">` +
        `<div class="tip-head">🌇 Atardecer</div>` +
