@@ -54,7 +54,7 @@
   .day .dmax { color: #ffd07a; font-weight: 600; }
   .day .dmin { color: rgba(150,180,230,0.7); }
   
-  .details { display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 14px 0; font-size: 11px; color: rgba(180,200,240,0.75); border-top: 0.5px solid rgba(255,255,255,0.06); margin-top: 6px; }
+  .details { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; padding: 8px 14px 0; font-size: 11px; color: rgba(180,200,240,0.75); border-top: 0.5px solid rgba(255,255,255,0.06); margin-top: 6px; }
   .det { display: flex; align-items: center; gap: 5px; }
   .det strong { color: #dde6ff; font-weight: 600; }
   .aqi-pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-left: 2px; }
@@ -65,6 +65,7 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   }
   #day-tooltip .dt-title { font-weight: 600; margin-bottom: 6px; color: #ffd07a; text-transform: capitalize; }
+  #day-tooltip .dt-grid { display: flex; gap: 18px; }
   #day-tooltip table { border-collapse: collapse; }
   #day-tooltip td { padding: 1px 8px 1px 0; }
   #day-tooltip td:first-child { color: rgba(180,200,240,0.6); }
@@ -121,7 +122,23 @@
     if(v <= 100) return { label:'Muy pobre',           color:'#e8533c' };
     return        { label:'Extremadamente pobre',     color:'#a13bdb' };
   }
-  
+
+  function pollutantColor(type, v){
+    if(v == null) return 'inherit';
+    // Umbrales OMS/UE en µg/m³ (verde · amarillo · naranja · rojo)
+    const T = {
+      pm25: [10, 20, 25],
+      pm10: [20, 40, 50],
+      o3:   [60, 100, 140],
+      no2:  [25, 45, 90],
+    }[type];
+    if(!T) return 'inherit';
+    if(v <= T[0]) return '#4ad27a'; // verde
+    if(v <= T[1]) return '#f4c542'; // amarillo
+    if(v <= T[2]) return '#f08a3c'; // naranja
+    return '#e8533c';                // rojo
+  }
+ 
   let weatherData = null;
   
   async function loadWeather(){
@@ -188,10 +205,10 @@
       <div class="det">🌫️ Calidad del aire: <strong>${air?.european_aqi ?? '—'}</strong>
         <span class="aqi-pill" style="background:${aqi.color};color:#0e1628;">${aqi.label}</span>
       </div>
-      <div class="det">PM2.5: <strong>${air?.pm2_5?.toFixed(1) ?? '—'}</strong> µg/m³</div>
-      <div class="det">PM10: <strong>${air?.pm10?.toFixed(1) ?? '—'}</strong> µg/m³</div>
-      <div class="det">O₃: <strong>${air?.ozone?.toFixed(0) ?? '—'}</strong> µg/m³</div>
-      <div class="det">NO₂: <strong>${air?.nitrogen_dioxide?.toFixed(0) ?? '—'}</strong> µg/m³</div>
+      <div class="det">PM2.5: <strong style="color:${pollutantColor('pm25', air?.pm2_5)}">${air?.pm2_5?.toFixed(1) ?? '—'}</strong> µg/m³</div>
+      <div class="det">PM10: <strong style="color:${pollutantColor('pm10', air?.pm10)}">${air?.pm10?.toFixed(1) ?? '—'}</strong> µg/m³</div>
+      <div class="det">O₃: <strong style="color:${pollutantColor('o3', air?.ozone)}">${air?.ozone?.toFixed(0) ?? '—'}</strong> µg/m³</div>
+      <div class="det">NO₂: <strong style="color:${pollutantColor('no2', air?.nitrogen_dioxide)}">${air?.nitrogen_dioxide?.toFixed(0) ?? '—'}</strong> µg/m³</div>
     `;
   
     document.querySelectorAll('.day').forEach(el => {
@@ -209,21 +226,22 @@
     if(startIdx < 0) return;
     const date = new Date(dateStr + 'T12:00:00');
     const title = `${DAY_LONG[date.getDay()]}, ${date.getDate()} de ${MONTH_LONG[date.getMonth()]}`;
-    let rows = '';
-    for(let h = 0; h < 24; h += 3){
+    let col1 = '', col2 = '';
+    for(let h = 0; h < 24; h += 2){
       const i = startIdx + h;
       if(i >= hourly.time.length) break;
       const [icon] = WCODE[hourly.weather_code[i]] || ['❓'];
       const t = Math.round(hourly.temperature_2m[i]);
       const p = hourly.precipitation_probability?.[i] ?? 0;
-      rows += `<tr>
+      const row = `<tr>
         <td>${String(h).padStart(2,'0')}:00</td>
         <td>${icon}</td>
         <td><strong>${t}°</strong></td>
         <td style="color:rgba(120,180,255,0.7)">${p > 0 ? '💧 ' + p + '%' : ''}</td>
       </tr>`;
+      if(h < 12) col1 += row; else col2 += row;
     }
-    dayTip.innerHTML = `<div class="dt-title">${title}</div><table>${rows}</table>`;
+    dayTip.innerHTML = `<div class="dt-title">${title}</div><div class="dt-grid"><table>${col1}</table><table>${col2}</table></div>`;
     dayTip.style.display = 'block';
     const tw = dayTip.offsetWidth, th = dayTip.offsetHeight;
     let x = e.clientX + 14, y = e.clientY + 14;
