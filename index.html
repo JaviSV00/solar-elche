@@ -33,9 +33,50 @@
   #tooltip .tip-block:last-of-type { padding-bottom: 0; }
   #tooltip .tip-head { color: #ffd07a; font-weight: 600; margin-bottom: 2px; }
   #tooltip .tip-row { display: flex; gap: 18px; }
+
+ /* ========== Panel meteo ========== */
+  #weather { padding: 10px 14px 4px; flex-shrink: 0; }
+  #weather-fail { display: none; padding: 8px 14px; font-size: 11px; color: rgba(255,150,150,0.7); }
+  .week { display: grid; grid-template-columns: 1.2fr repeat(7, 1fr); gap: 8px; align-items: center; }
+  .now { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-right: 0.5px solid rgba(255,255,255,0.08); }
+  .now .place { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #ffd07a; }
+  .now .label { font-size: 9px; color: rgba(180,200,240,0.5); letter-spacing: 1px; }
+  .now-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .now-row .icon { font-size: 28px; line-height: 1; }
+  .now-row .temp { font-size: 22px; font-weight: 600; color: #dde6ff; }
+  .now-row .desc { font-size: 11px; color: rgba(180,200,240,0.7); }
+  
+  .day { text-align: center; padding: 6px 4px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+  .day:hover { background: rgba(255,255,255,0.04); }
+  .day .dname { font-size: 11px; color: rgba(180,200,240,0.6); text-transform: capitalize; }
+  .day .dicon { font-size: 22px; margin: 2px 0; }
+  .day .dtemp { font-size: 11px; }
+  .day .dmax { color: #ffd07a; font-weight: 600; }
+  .day .dmin { color: rgba(150,180,230,0.7); }
+  
+  .details { display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 14px 0; font-size: 11px; color: rgba(180,200,240,0.75); border-top: 0.5px solid rgba(255,255,255,0.06); margin-top: 6px; }
+  .det { display: flex; align-items: center; gap: 5px; }
+  .det strong { color: #dde6ff; font-weight: 600; }
+  .aqi-pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-left: 2px; }
+  
+  #day-tooltip {
+    position: fixed; background: rgba(6,12,28,0.97); border: 0.5px solid rgba(255,255,255,0.15); border-radius: 8px;
+    padding: 8px 12px; font-size: 11px; color: #dde6ff; pointer-events: none; display: none; z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  #day-tooltip .dt-title { font-weight: 600; margin-bottom: 6px; color: #ffd07a; text-transform: capitalize; }
+  #day-tooltip table { border-collapse: collapse; }
+  #day-tooltip td { padding: 1px 8px 1px 0; }
+  #day-tooltip td:first-child { color: rgba(180,200,240,0.6); }
 </style>
 </head>
 <body>
+  <div id="weather">
+   <div class="week" id="week"></div>
+   <div class="details" id="details"></div>
+  </div>
+  <div id="weather-fail">No se pudo cargar el tiempo. El gráfico solar sigue funcionando.</div>
+  <div id="day-tooltip"></div>
 <div id="wrap">
   <div id="canvas-wrap">
     <canvas id="ac"></canvas>
@@ -51,6 +92,150 @@
 </div>
 
 <script>
+ /* ============================================================
+   METEOROLOGÍA — Open-Meteo (gratis, sin API key)
+   ============================================================ */
+  const METEO_LAT = 38.2669, METEO_LON = -0.6985;
+  
+  const WCODE = {
+    0:['☀️','Despejado'], 1:['🌤️','Mayormente despejado'], 2:['⛅','Parcialmente nublado'], 3:['☁️','Nublado'],
+    45:['🌫️','Niebla'], 48:['🌫️','Niebla con escarcha'],
+    51:['🌦️','Llovizna ligera'], 53:['🌦️','Llovizna'], 55:['🌦️','Llovizna densa'],
+    61:['🌧️','Lluvia ligera'], 63:['🌧️','Lluvia'], 65:['🌧️','Lluvia intensa'],
+    71:['🌨️','Nieve ligera'], 73:['🌨️','Nieve'], 75:['🌨️','Nieve intensa'], 77:['🌨️','Granizo blando'],
+    80:['🌧️','Chubascos ligeros'], 81:['🌧️','Chubascos'], 82:['⛈️','Chubascos fuertes'],
+    85:['🌨️','Nevadas ligeras'], 86:['🌨️','Nevadas intensas'],
+    95:['⛈️','Tormenta'], 96:['⛈️','Tormenta con granizo'], 99:['⛈️','Tormenta con granizo fuerte'],
+  };
+  const DAY_SHORT = ['dom','lun','mar','mié','jue','vie','sáb'];
+  const DAY_LONG  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const MONTH_LONG = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  
+  function windDir(deg){ return ['N','NE','E','SE','S','SO','O','NO'][Math.round(deg/45)%8]; }
+  function aqiBand(v){
+    if(v == null) return { label:'—', color:'#888' };
+    if(v <= 20)  return { label:'Muy bueno',           color:'#4ad27a' };
+    if(v <= 40)  return { label:'Bueno',               color:'#a8d24a' };
+    if(v <= 60)  return { label:'Regular',             color:'#f4c542' };
+    if(v <= 80)  return { label:'Pobre',               color:'#f08a3c' };
+    if(v <= 100) return { label:'Muy pobre',           color:'#e8533c' };
+    return        { label:'Extremadamente pobre',     color:'#a13bdb' };
+  }
+  
+  let weatherData = null;
+  
+  async function loadWeather(){
+    try{
+      const fcUrl = `https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}`
+        + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,uv_index`
+        + `&hourly=temperature_2m,weather_code,precipitation_probability`
+        + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
+        + `&timezone=auto&forecast_days=7`;
+      const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${METEO_LAT}&longitude=${METEO_LON}`
+        + `&current=european_aqi,pm10,pm2_5,ozone,nitrogen_dioxide&timezone=auto`;
+      const [fc, aq] = await Promise.all([
+        fetch(fcUrl).then(r => r.json()),
+        fetch(aqUrl).then(r => r.json())
+      ]);
+      weatherData = { current: fc.current, daily: fc.daily, hourly: fc.hourly, air: aq.current };
+      renderWeather();
+    } catch(err){
+      console.error('Open-Meteo error:', err);
+      document.getElementById('weather').style.display = 'none';
+      document.getElementById('weather-fail').style.display = 'block';
+    }
+  }
+  
+  function renderWeather(){
+    if(!weatherData) return;
+    const { current, daily, air } = weatherData;
+    const week = document.getElementById('week');
+    const details = document.getElementById('details');
+  
+    const [iconNow, descNow] = WCODE[current.weather_code] || ['❓','—'];
+    let html = `
+      <div class="now">
+        <div class="place">ELCHE</div>
+        <div class="label">AHORA</div>
+        <div class="now-row">
+          <div class="icon">${iconNow}</div>
+          <div>
+            <div class="temp">${Math.round(current.temperature_2m)}°C</div>
+            <div class="desc">${descNow}</div>
+          </div>
+        </div>
+      </div>`;
+  
+    for(let i = 0; i < 7; i++){
+      const date = new Date(daily.time[i] + 'T12:00:00');
+      const dn = i === 0 ? 'hoy' : DAY_SHORT[date.getDay()];
+      const [icon] = WCODE[daily.weather_code[i]] || ['❓'];
+      html += `
+        <div class="day" data-day-index="${i}">
+          <div class="dname">${dn}</div>
+          <div class="dicon">${icon}</div>
+          <div class="dtemp"><span class="dmax">${Math.round(daily.temperature_2m_max[i])}°</span> · <span class="dmin">${Math.round(daily.temperature_2m_min[i])}°</span></div>
+        </div>`;
+    }
+    week.innerHTML = html;
+  
+    const aqi = aqiBand(air?.european_aqi);
+    details.innerHTML = `
+      <div class="det">💧 Humedad: <strong>${current.relative_humidity_2m}%</strong></div>
+      <div class="det">🌡️ Sensación: <strong>${Math.round(current.apparent_temperature)}°C</strong></div>
+      <div class="det">💨 Viento: <strong>${Math.round(current.wind_speed_10m)} km/h ${windDir(current.wind_direction_10m)}</strong></div>
+      <div class="det">☀️ UV: <strong>${current.uv_index?.toFixed(1) ?? '—'}</strong></div>
+      <div class="det">🌫️ Calidad del aire: <strong>${air?.european_aqi ?? '—'}</strong>
+        <span class="aqi-pill" style="background:${aqi.color};color:#0e1628;">${aqi.label}</span>
+      </div>
+      <div class="det">PM2.5: <strong>${air?.pm2_5?.toFixed(1) ?? '—'}</strong> µg/m³</div>
+      <div class="det">PM10: <strong>${air?.pm10?.toFixed(1) ?? '—'}</strong> µg/m³</div>
+      <div class="det">O₃: <strong>${air?.ozone?.toFixed(0) ?? '—'}</strong> µg/m³</div>
+      <div class="det">NO₂: <strong>${air?.nitrogen_dioxide?.toFixed(0) ?? '—'}</strong> µg/m³</div>
+    `;
+  
+    document.querySelectorAll('.day').forEach(el => {
+      el.addEventListener('mousemove', e => showDayTip(e, parseInt(el.dataset.dayIndex)));
+      el.addEventListener('mouseleave', hideDayTip);
+    });
+  }
+  
+  const dayTip = document.getElementById('day-tooltip');
+  function showDayTip(e, dayIdx){
+    if(!weatherData) return;
+    const { hourly, daily } = weatherData;
+    const dateStr = daily.time[dayIdx];
+    const startIdx = hourly.time.findIndex(t => t.startsWith(dateStr));
+    if(startIdx < 0) return;
+    const date = new Date(dateStr + 'T12:00:00');
+    const title = `${DAY_LONG[date.getDay()]}, ${date.getDate()} de ${MONTH_LONG[date.getMonth()]}`;
+    let rows = '';
+    for(let h = 0; h < 24; h += 3){
+      const i = startIdx + h;
+      if(i >= hourly.time.length) break;
+      const [icon] = WCODE[hourly.weather_code[i]] || ['❓'];
+      const t = Math.round(hourly.temperature_2m[i]);
+      const p = hourly.precipitation_probability?.[i] ?? 0;
+      rows += `<tr>
+        <td>${String(h).padStart(2,'0')}:00</td>
+        <td>${icon}</td>
+        <td><strong>${t}°</strong></td>
+        <td style="color:rgba(120,180,255,0.7)">${p > 0 ? '💧 ' + p + '%' : ''}</td>
+      </tr>`;
+    }
+    dayTip.innerHTML = `<div class="dt-title">${title}</div><table>${rows}</table>`;
+    dayTip.style.display = 'block';
+    const tw = dayTip.offsetWidth, th = dayTip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if(x + tw > window.innerWidth - 8)  x = e.clientX - tw - 14;
+    if(y + th > window.innerHeight - 8) y = e.clientY - th - 14;
+    dayTip.style.left = x + 'px';
+    dayTip.style.top  = y + 'px';
+  }
+  function hideDayTip(){ dayTip.style.display = 'none'; }
+  
+  loadWeather();
+  setInterval(loadWeather, 15 * 60 * 1000);
 (function(){
   const LAT = 38.2669, LON = -0.6985;
   const YEAR = new Date().getFullYear();
