@@ -264,9 +264,13 @@
     const d = data[Math.max(0, Math.min(DAYS - 1, doy - 1))];
     tip.innerHTML =
       `<strong>${doyToDate(d.doy)}</strong><br>` +
+      `Amanecer náutico: ${fmt(d.dawnNaut)}<br>` +
+      `Amanecer civil: ${fmt(d.dawnCivil)}<br>` +
       `Amanecer: ${fmt(d.rise)}<br>` +
       `Mediod\u00eda: ${fmt(d.noon)}<br>` +
       `Atardecer: ${fmt(d.set)}<br>` +
+      `Crepúsculo civil: ${fmt(d.duskCivil)}<br>` +
+      `Crepúsculo náutico: ${fmt(d.duskNaut)}<br>` +
       `Luz solar: <strong>${fmtDur(d.set - d.rise)}</strong><br>` +
       `Horario: UTC+${d.offset}`;
     tip.style.display = 'block';
